@@ -98,12 +98,7 @@ resource "aws_subnet" "epPrivateSubnet2" {
 
 resource "aws_route_table" "epPublicRT" {
   vpc_id = aws_vpc.epVPC.id
-  route = [ 
-    {
-     destination_cidr_block = "0.0.0.0/0"
-     gateway_id             = aws_internet_gateway.epInternetGateway.id
-    }
-  ]
+
   tags = {
     Name = "epPublicRouteTable"
   }
@@ -116,12 +111,7 @@ resource "aws_route_table" "epPublicRT" {
 resource "aws_route_table" "epPrivateRT" {
   vpc_id = aws_vpc.epVPC.id
   
-  route = [ 
-   {
-     destination_cidr_block = "0.0.0.0/0"
-     nat_gateway_id         = aws_nat_gateway.epNATGateway.id
-    }
-  ] 
+ 
 
   tags = {
     Name = "epRouteTable"
@@ -130,19 +120,19 @@ resource "aws_route_table" "epPrivateRT" {
 
 #Route for internet gateway
 
-#resource "aws_route" "epIGRoute" {
-#  route_table_id         = aws_route_table.epPublicRT.id
-#  destination_cidr_block = "0.0.0.0/0"
-#  gateway_id             = aws_internet_gateway.epInternetGateway.id
-#}
+resource "aws_route" "epIGRoute" {
+  route_table_id         = aws_route_table.epPublicRT.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.epInternetGateway.id
+}
 
 #Route for NAT gateway
 
-#resource "aws_route" "epNATRoute" {
-#  route_table_id         = aws_route_table.epPrivateRT.id
-#  destination_cidr_block = "0.0.0.0/0"
-#  nat_gateway_id         = aws_nat_gateway.epNATGateway.id
-#}
+resource "aws_route" "epNATRoute" {
+  route_table_id         = aws_route_table.epPrivateRT.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.epNATGateway.id
+}
 
 #Associate public subnet with public route table
 
@@ -191,7 +181,7 @@ resource "aws_security_group" "epPublicSG" {
 resource "aws_security_group" "epPrivateSG" {
    vpc_id = aws_vpc.epVPC.id
    name = "epPrivateSG"
-   description = "tcp 3389 ingress rule for epPrivateSG"
+   description = "sql 1433 ingress rule for epPrivateSG"
    depends_on = [aws_vpc.epVPC]
    ingress {
       from_port   = 1433    #MSSQL
@@ -207,7 +197,7 @@ resource "aws_security_group" "epPrivateSG" {
    }
   
    tags = {
-    Name = "epPublicSG"
+    Name = "epPrivateSG"
   }
 }
 
