@@ -5,7 +5,7 @@
 # # taken from here:https://medium.com/appgambit/terraform-aws-vpc-with-private-public-subnets-with-nat-4094ad2ab331
 # with an instance added, connect to instance using rdp and password obtained via aws console
 # https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Tutorials.WebServerDB.CreateVPC.html#CHAP_Tutorials.WebServerDB.CreateVPC.AdditionalSubnets
-#
+#  
 terraform {
   required_version = ">= 0.13"
   required_providers {
@@ -74,9 +74,19 @@ resource "aws_subnet" "epPublicSubnet" {
   }
 }
 
-resource "aws_subnet" "epPrivateSubnet1" {
+resource "aws_subnet" "epPrivateSubnetApp" {
   vpc_id     = aws_vpc.epVPC.id
   cidr_block = "10.2.2.0/24"
+  availability_zone = "eu-west-2a"
+  map_public_ip_on_launch = false
+  tags = {
+    Name = "epPrivateSubnetApp"
+  }
+}
+
+resource "aws_subnet" "epPrivateSubnet1" {
+  vpc_id     = aws_vpc.epVPC.id
+  cidr_block = "10.2.3.0/24"
   availability_zone = "eu-west-2a"
   map_public_ip_on_launch = false
   tags = {
@@ -86,7 +96,7 @@ resource "aws_subnet" "epPrivateSubnet1" {
 
 resource "aws_subnet" "epPrivateSubnet2" {
   vpc_id     = aws_vpc.epVPC.id
-  cidr_block = "10.2.3.0/24"
+  cidr_block = "10.2.4.0/24"
   availability_zone = "eu-west-2b"
   map_public_ip_on_launch = false
   tags = {
@@ -108,11 +118,15 @@ resource "aws_route_table" "epPublicRT" {
 
 #Create New route table for private subnet
 
+resource "aws_route_table" "epPrivateRTApp" {
+  vpc_id = aws_vpc.epVPC.id
+  tags = {
+    Name = "epRouteTableApp"
+  }
+}
+
 resource "aws_route_table" "epPrivateRT" {
   vpc_id = aws_vpc.epVPC.id
-  
- 
-
   tags = {
     Name = "epRouteTable"
   }
@@ -143,6 +157,11 @@ resource "aws_route_table_association" "epPublicTRAss" {
 
 #Associate private subnet with private route table
 
+resource "aws_route_table_association" "epPrivateApp" {
+  subnet_id      = aws_subnet.epPrivateSubnetApp.id
+  route_table_id = aws_route_table.epPrivateRTApp.id
+}
+
 resource "aws_route_table_association" "epPrivate1" {
   subnet_id      = aws_subnet.epPrivateSubnet1.id
   route_table_id = aws_route_table.epPrivateRT.id
@@ -155,10 +174,10 @@ resource "aws_route_table_association" "epPrivate2" {
 
 #Create security groups
 
-resource "aws_security_group" "epPublicSG" {
+resource "aws_security_group" "epAppSG" {
    vpc_id = aws_vpc.epVPC.id
-   name = "epPublicSG"
-   description = "tcp 3389 ingress rule for epPublicSG"
+   name = "epAppSG"
+   description = "tcp 3389 ingress rule for epAppSG"
    depends_on = [aws_vpc.epVPC]
    ingress {
       from_port   = 3389
@@ -174,14 +193,27 @@ resource "aws_security_group" "epPublicSG" {
    }
   
    tags = {
-    Name = "epPublicSG"
+    Name = "epAppSG"
   }
 }
 
-resource "aws_security_group" "epPrivateSG" {
+#Create app instance
+
+resource "aws_instance" "epAppInstance" {
+  ami           = "ami-0f34584723e6f6fa9" #London
+  instance_type = "t2.micro"
+  subnet_id = aws_subnet.epPrivateSubnetApp.id
+  key_name = "GillepKeyPair"
+  vpc_security_group_ids = [aws_security_group.epAppSG.id]
+  tags = {
+     Name = "epAppInstance"
+  }
+}
+
+resource "aws_security_group" "epDBSG" {
    vpc_id = aws_vpc.epVPC.id
    name = "epPrivateSG"
-   description = "sql 1433 ingress rule for epPrivateSG"
+   description = "sql 1433 ingress rule for epDBSG"
    depends_on = [aws_vpc.epVPC]
    ingress {
       from_port   = 1433    #MSSQL
@@ -197,9 +229,11 @@ resource "aws_security_group" "epPrivateSG" {
    }
   
    tags = {
-    Name = "epPrivateSG"
+    Name = "epDBSG"
   }
 }
+
+# subgroup for rds database
 
 resource "aws_db_subnet_group" "epDBSubnetGrp" {
   name       = "epdbsubnetgrp"
@@ -210,6 +244,8 @@ resource "aws_db_subnet_group" "epDBSubnetGrp" {
     Name = "epDBSubnetGrp"
   }
 }
+
+# rds database instance
 
 resource "aws_db_instance" "epDatabaseInstance" {
   allocated_storage    = 20
@@ -222,15 +258,4 @@ resource "aws_db_instance" "epDatabaseInstance" {
 }
 
 #************************************************
-#Create instance
-resource "aws_instance" "epPublicInstance" {
-  ami           = "ami-0f34584723e6f6fa9" #London
-  instance_type = "t2.micro"
-  subnet_id = aws_subnet.epPublicSubnet.id
-  key_name = "epDesktopKeyPair"
-  vpc_security_group_ids = [aws_security_group.epPublicSG.id]
-  tags = {
-     Name = "epInstance"
-  }
-}
 
